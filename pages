@@ -1,0 +1,2666 @@
+//  Landing page
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { User } from "@/entities/User";
+import { HazardReport } from "@/entities/HazardReport";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertTriangle,
+  MapPin,
+  FileText,
+  Users,
+  Globe,
+  Phone,
+  Shield,
+  Waves,
+  ChevronRight,
+  Award,
+  Crown,
+  Activity,
+  Zap,
+  Eye,
+  TrendingUp
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const languages = [
+  { code: 'english', name: 'English', native: 'English' },
+  { code: 'hindi', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'bengali', name: 'Bengali', native: 'বাংলা' },
+  { code: 'tamil', name: 'Tamil', native: 'தமিழ্' },
+  { code: 'telugu', name: 'Telugu', native: 'తెలుగు' },
+  { code: 'marathi', name: 'Marathi', native: 'मराठी' },
+  { code: 'gujarati', name: 'Gujarati', native: 'ગુજરાતী' }
+];
+
+const quickActions = [
+  {
+    title: "Report Emergency",
+    description: "Report immediate coastal hazards",
+    url: createPageUrl("ReportHazard"),
+    icon: AlertTriangle,
+    color: "bg-red-500 hover:bg-red-600",
+    urgent: true
+  },
+  {
+    title: "View Hazard Map",
+    description: "Check nearby hazard alerts",
+    url: createPageUrl("HazardFeed"),
+    icon: MapPin,
+    color: "bg-blue-500 hover:bg-blue-600"
+  },
+  {
+    title: "My Reports",
+    description: "Track your submissions",
+    url: createPageUrl("MyReports"),
+    icon: FileText,
+    color: "bg-green-500 hover:bg-green-600"
+  },
+  {
+    title: "Community",
+    description: "Join fellow guardians",
+    url: createPageUrl("Community"),
+    icon: Users,
+    color: "bg-purple-500 hover:bg-purple-600"
+  }
+];
+
+export default function Landing() {
+  const [user, setUser] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
+  const [selectedLanguage, setSelectedLanguage] = useState('english');
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [liveStatus, setLiveStatus] = useState({
+    coastalStatus: 'Safe',
+    activeAlerts: 0,
+    lastUpdate: new Date()
+  });
+
+  useEffect(() => {
+    loadUserData();
+    loadRecentReports();
+    // Update live status every 30 seconds
+    const interval = setInterval(() => {
+      setLiveStatus(prev => ({
+        ...prev,
+        lastUpdate: new Date()
+      }));
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const userData = await User.me();
+      setUser(userData);
+      
+      // Check if this is first time login and no role selected
+      const selectedRole = localStorage.getItem('selectedRole');
+      if (!selectedRole) {
+        setShowRoleSelection(true);
+      }
+    } catch (error) {
+      console.log('User not authenticated - showing public view');
+    }
+  };
+
+  const loadRecentReports = async () => {
+    try {
+      const reports = await HazardReport.list('-created_date', 5);
+      setRecentReports(reports);
+      
+      // Update live status based on reports
+      const activeAlerts = reports.filter(r => ['pending', 'investigating', 'verified'].includes(r.status)).length;
+      const hasCritical = reports.some(r => r.severity === 'critical');
+      
+      setLiveStatus(prev => ({
+        ...prev,
+        coastalStatus: hasCritical ? 'High Alert' : activeAlerts > 3 ? 'Moderate Risk' : 'Safe',
+        activeAlerts
+      }));
+    } catch (error) {
+      console.error('Error loading recent reports:', error);
+    }
+  };
+
+  const handleLanguageSelect = async (language) => {
+    setSelectedLanguage(language);
+    if (user) {
+      try {
+        await User.updateMyUserData({ preferred_language: language });
+      } catch (error) {
+        console.error('Error updating language preference:', error);
+      }
+    } else {
+      localStorage.setItem('preferred_language', language);
+    }
+  };
+
+  const handleRoleSelection = (role) => {
+    localStorage.setItem('selectedRole', role);
+    setShowRoleSelection(false);
+    
+    if (role === 'admin') {
+      window.location.href = createPageUrl('AdminDashboard');
+    }
+  };
+
+  const handleCall = (number) => {
+    window.open(`tel:${number}`, '_self');
+  };
+
+  const handleQuickActionClick = (url) => {
+    window.location.href = url;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-cyan-100 pb-20 md:pb-4">
+      {/* Role Selection Modal for First Time Users */}
+      {showRoleSelection && user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-center">Welcome to CoastGuard AI!</CardTitle>
+              <p className="text-center text-gray-600">Please select your access level:</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button
+                onClick={() => handleRoleSelection('user')}
+                className="w-full bg-blue-600 hover:bg-blue-700 justify-start h-16"
+              >
+                <Shield className="w-6 h-6 mr-4" />
+                <div className="text-left">
+                  <div className="font-semibold">Continue as User</div>
+                  <div className="text-sm opacity-90">Report hazards and access community features</div>
+                </div>
+              </Button>
+              
+              <Button
+                onClick={() => handleRoleSelection('admin')}
+                variant="outline"
+                className="w-full border-purple-200 hover:bg-purple-50 justify-start h-16"
+              >
+                <Crown className="w-6 h-6 mr-4 text-purple-600" />
+                <div className="text-left">
+                  <div className="font-semibold text-purple-700">Login as Administrator</div>
+                  <div className="text-sm text-purple-600">Access admin dashboard and management tools</div>
+                </div>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-100 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/30 via-transparent to-blue-600/30"></div>
+        
+        <div className="absolute top-20 left-10 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute top-40 right-20 w-24 h-24 bg-cyan-300/20 rounded-full blur-lg animate-bounce"></div>
+        <div className="absolute bottom-20 left-1/3 w-20 h-20 bg-blue-300/20 rounded-full blur-md animate-ping"></div>
+
+        <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-20 text-white">
+          {/* Language Selector in Corner */}
+          <div className="absolute top-4 right-4 z-10">
+            <Select value={selectedLanguage} onValueChange={handleLanguageSelect}>
+              <SelectTrigger className="w-48 bg-white/10 border-white/20 text-white backdrop-blur-sm">
+                <Globe className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Select Language" />
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    <div className="flex items-center gap-2">
+                      <span>{lang.native}</span>
+                      <span className="text-gray-500">({lang.name})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="text-center">
+            <div className="flex justify-center items-center gap-4 mb-8">
+              <div className="relative">
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-2xl">
+                  <Waves className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -inset-2 bg-white/10 rounded-full blur-md animate-pulse"></div>
+              </div>
+              <div>
+                <h1 className="text-4xl md:text-6xl font-bold mb-2 tracking-tight">
+                  CoastGuard AI
+                </h1>
+                <p className="text-blue-100 text-sm md:text-base tracking-wide">
+                  Next-Generation Coastal Hazard Management
+                </p>
+              </div>
+            </div>
+            
+            <p className="text-xl md:text-2xl mb-4 text-blue-100 font-light">
+              Protecting communities through collective awareness and rapid response
+            </p>
+            
+            {!user && (
+              <div className="mb-8">
+                <Button 
+                  onClick={() => User.login()}
+                  className="bg-white text-blue-600 hover:bg-blue-50 text-lg px-8 py-3 rounded-full font-bold shadow-xl transform transition-all duration-300 hover:scale-110"
+                >
+                  Login to Get Started
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1200 120" className="w-full h-12 md:h-20">
+            <defs>
+              <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgb(59 130 246)" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="rgb(219 234 254)" stopOpacity="0.2" />
+              </linearGradient>
+            </defs>
+            <path 
+              fill="url(#wave-gradient)" 
+              d="M0,60 C300,120 900,0 1200,60 L1200,120 L0,120 Z"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Live Coastal Status - Mind-blowing Feature */}
+        <Card className="mb-12 -mt-20 relative z-10 bg-white/90 backdrop-blur-lg shadow-2xl border border-blue-200 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-white to-cyan-50/50"></div>
+          <CardContent className="relative p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
+                    liveStatus.coastalStatus === 'High Alert' ? 'bg-red-500' :
+                    liveStatus.coastalStatus === 'Moderate Risk' ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}>
+                    <Activity className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="absolute -inset-2 rounded-full animate-ping bg-current opacity-20"></div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-800">Live Coastal Status</h3>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-semibold ${
+                      liveStatus.coastalStatus === 'High Alert' ? 'text-red-600' :
+                      liveStatus.coastalStatus === 'Moderate Risk' ? 'text-yellow-600' : 'text-green-600'
+                    }`}>
+                      {liveStatus.coastalStatus}
+                    </span>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                      {liveStatus.activeAlerts} Active Alerts
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Last Updated</p>
+                <p className="font-mono text-sm text-gray-800">
+                  {liveStatus.lastUpdate.toLocaleTimeString()}
+                </p>
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-600">Live</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {quickActions.map((action) => {
+              const IconComponent = action.icon;
+              return (
+                <div key={action.title} onClick={() => handleQuickActionClick(action.url)}>
+                  <Card 
+                    className={`group hover:shadow-2xl transition-all duration-500 transform hover:scale-110 bg-gradient-to-br from-white to-blue-50 border-blue-200 cursor-pointer ${
+                      action.urgent ? 'ring-2 ring-red-300 animate-pulse shadow-lg shadow-red-100' : 'hover:shadow-blue-100'
+                    }`}
+                  >
+                    <CardContent className="p-6 text-center relative overflow-hidden">
+                      <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 ${action.color.replace('hover:bg-', 'bg-')}`}></div>
+                      
+                      <div className={`relative z-10 w-14 h-14 rounded-xl mx-auto mb-4 flex items-center justify-center text-white shadow-lg ${action.color} transform group-hover:rotate-12 transition-transform duration-500`}>
+                        <IconComponent className="w-7 h-7" />
+                      </div>
+                      <h3 className="font-bold text-gray-800 mb-2 group-hover:text-blue-700 transition-colors">
+                        {action.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">{action.description}</p>
+                      <ChevronRight className="w-4 h-4 text-gray-400 mx-auto group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300" />
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* User Dashboard - Subtle, Clean */}
+        {user && (
+          <div className="mb-12">
+            <Card className="bg-blue-100 shadow-lg border border-blue-200">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-6">
+                  <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-md">
+                    <span className="text-3xl font-bold text-blue-600">
+                      {user?.full_name?.[0] || 'U'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <h2 className="text-3xl font-bold mb-2 text-blue-800">{user?.full_name || 'Coastal Guardian'}</h2>
+                    <Badge className="bg-blue-200 text-blue-800 mb-4 px-4 py-1">
+                      <Award className="w-4 h-4 mr-2" />
+                      Guardian Level: Champion
+                    </Badge>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                      <div className="bg-white rounded-lg p-4 shadow-sm">
+                        <p className="text-3xl font-bold text-blue-600">{user.total_reports || 0}</p>
+                        <p className="text-blue-700 text-sm">Total Reports</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm">
+                        <p className="text-3xl font-bold text-green-600">{user.verified_reports || 0}</p>
+                        <p className="text-green-700 text-sm">Verified</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm">
+                        <p className="text-3xl font-bold text-purple-600">{user.credibility_score || 85}</p>
+                        <p className="text-purple-700 text-sm">Credibility</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 shadow-sm">
+                        <p className="text-3xl font-bold text-orange-600">{user.badges?.length || 3}</p>
+                        <p className="text-orange-700 text-sm">Badges</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Recent Activity */}
+        <div className="mb-12">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+              Recent Coastal Activity
+            </h2>
+            <Button 
+              variant="outline" 
+              className="text-blue-600 border-blue-300 hover:bg-blue-50 shadow-sm"
+              onClick={() => handleQuickActionClick(createPageUrl("HazardFeed"))}
+            >
+              View All Reports
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+          
+          {recentReports.length > 0 ? (
+            <div className="grid gap-6">
+              {recentReports.map((report) => (
+                <Card key={report.id} className="bg-gradient-to-r from-white to-blue-50 border-blue-200 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${
+                          report.severity === 'critical' ? 'bg-red-500 text-white' :
+                          report.severity === 'high' ? 'bg-orange-500 text-white' :
+                          report.severity === 'medium' ? 'bg-yellow-500 text-white' :
+                          'bg-green-500 text-white'
+                        }`}>
+                          <AlertTriangle className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-800 text-lg capitalize">{report.type} Alert</h3>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                            <MapPin className="w-4 h-4" />
+                            <span>{report.location?.district || 'Unknown location'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge className={
+                          report.status === 'verified' ? 'bg-green-100 text-green-800' :
+                          report.status === 'investigating' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }>
+                          {report.status === 'verified' && <Shield className="w-3 h-3 mr-1" />}
+                          {report.status}
+                        </Badge>
+                        <Badge variant="outline" className={
+                          report.severity === 'critical' ? 'border-red-300 text-red-700' :
+                          report.severity === 'high' ? 'border-orange-300 text-orange-700' :
+                          'border-yellow-300 text-yellow-700'
+                        }>
+                          {report.severity}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="bg-gradient-to-r from-white to-blue-50 border-blue-200">
+              <CardContent className="p-12 text-center">
+                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <MapPin className="w-10 h-10 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-700 mb-2">All Clear!</h3>
+                <p className="text-gray-500 mb-6">No recent hazard reports in your area. Stay vigilant!</p>
+                <div className="flex justify-center">
+                  <Badge className="bg-green-100 text-green-800 px-4 py-2">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Safe Zone
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Emergency Contacts - Subtle with Circular Call Buttons */}
+        <Card className="bg-red-50 border-red-100 shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-medium text-red-700">
+              <Phone className="w-4 h-4" />
+              Emergency Contacts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-red-50">
+                <p className="font-semibold text-gray-800 mb-2">National Emergency</p>
+                <p className="text-2xl font-bold text-red-600 mb-3">112</p>
+                <Button 
+                  size="sm"
+                  onClick={() => handleCall('112')}
+                  className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-700 p-0"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-red-50">
+                <p className="font-semibold text-gray-800 mb-2">Coast Guard</p>
+                <p className="text-2xl font-bold text-red-600 mb-3">1554</p>
+                <Button 
+                  size="sm"
+                  onClick={() => handleCall('1554')}
+                  className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-700 p-0"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-red-50">
+                <p className="font-semibold text-gray-800 mb-2">Disaster Management</p>
+                <p className="text-2xl font-bold text-red-600 mb-3">108</p>
+                <Button 
+                  size="sm"
+                  onClick={() => handleCall('108')}
+                  className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-700 p-0"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="mt-6 text-center">
+              <p className="text-red-600 font-medium text-sm">
+                🚨 In case of immediate danger, call 112 for fastest response
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// report hazard
+
+import React, { useState, useEffect, useRef } from "react";
+import { User } from "@/entities/User";
+import { HazardReport } from "@/entities/HazardReport";
+import { UploadFile } from "@/integrations/Core";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertTriangle,
+  Camera,
+  MapPin,
+  Mic,
+  CheckCircle,
+  WifiOff,
+  Loader2,
+  X,
+  Play,
+  Square,
+  Siren,
+  Phone,
+  Video
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+const hazardTypes = [
+  { value: 'flood', label: 'Flooding', icon: '🌊', description: 'Water overflow affecting areas' },
+  { value: 'cyclone', label: 'Cyclone/Storm', icon: '🌪️', description: 'Strong winds and rain' },
+  { value: 'erosion', label: 'Coastal Erosion', icon: '🏖️', description: 'Beach/cliff damage' },
+  { value: 'pollution', label: 'Water Pollution', icon: '🛢️', description: 'Oil spills/contamination' },
+  { value: 'tsunami', label: 'Tsunami Warning', icon: '🌊', description: 'Abnormal wave activity' },
+  { value: 'storm_surge', label: 'Storm Surge', icon: '⛈️', description: 'High sea level rise' },
+  { value: 'other', label: 'Other Hazard', icon: '⚠️', description: 'Other emergency' }
+];
+
+const severityLevels = [
+  { value: 'low', label: 'Low Risk', color: 'bg-green-200 border-2 border-green-400', description: 'Minor concern' },
+  { value: 'medium', label: 'Medium Risk', color: 'bg-yellow-200 border-2 border-yellow-400', description: 'Moderate risk' },
+  { value: 'high', label: 'High Risk', color: 'bg-orange-200 border-2 border-orange-400', description: 'Significant danger' },
+  { value: 'critical', label: 'Critical', color: 'bg-red-200 border-2 border-red-400', description: 'Immediate danger' }
+];
+
+export default function ReportHazard() {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [sosMode, setSosMode] = useState(false);
+  const [formData, setFormData] = useState({
+    type: '',
+    severity: 'medium',
+    description: '',
+    location: {
+      latitude: null,
+      longitude: null,
+      address: '',
+      district: '',
+      state: ''
+    },
+    media_urls: [],
+    voice_recording_url: '',
+    contact_number: '',
+    is_offline_sync: false
+  });
+
+  // Media states
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [hasMedia, setHasMedia] = useState(false);
+  const [hasLocation, setHasLocation] = useState(false);
+
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+
+  // Camera refs
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    loadUser();
+    
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const userData = await User.me();
+      setUser(userData);
+    } catch (error) {
+      console.log('User not authenticated');
+    }
+  };
+
+  const handleSosActivation = async () => {
+    setSosMode(true);
+    setFormData(prev => ({
+      ...prev,
+      severity: 'critical',
+      type: 'other',
+      description: 'SOS Emergency Report'
+    }));
+
+    // Auto-get location
+    await handleGetLocation(true);
+    
+    // Start camera for immediate capture
+    startCamera();
+  };
+
+  const handleGetLocation = (isSos = false) => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    setLocationError('');
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 15000, // Updated timeout
+      maximumAge: 60000 // Updated maximumAge
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        // Use reverse geocoding to get address
+        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`)
+          .then(response => response.json())
+          .then(data => {
+            setFormData(prev => ({
+              ...prev,
+              location: {
+                latitude,
+                longitude,
+                address: data.locality || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+                district: data.city || data.locality || '',
+                state: data.principalSubdivision || ''
+              }
+            }));
+            setHasLocation(true);
+            setIsGettingLocation(false);
+            
+            if (isSos) {
+              alert('Emergency location captured! Camera is ready for capture.');
+            }
+          })
+          .catch(() => {
+            setFormData(prev => ({
+              ...prev,
+              location: {
+                ...prev.location,
+                latitude,
+                longitude,
+                address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+              }
+            }));
+            setHasLocation(true);
+            setIsGettingLocation(false);
+          });
+      },
+      (error) => {
+        setLocationError(`Location error: ${error.message}`);
+        setIsGettingLocation(false);
+      },
+      options
+    );
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' }, // Use back camera on mobile
+        audio: false 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Unable to access camera. Please check permissions.');
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    setIsUploading(true);
+    
+    try {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        try {
+          const { file_url } = await UploadFile({ file: blob });
+          setFormData(prev => ({
+            ...prev,
+            media_urls: [...prev.media_urls, file_url]
+          }));
+          setHasMedia(true);
+          
+          if (sosMode) {
+            alert('Emergency photo captured successfully!');
+          }
+        } catch (error) {
+          console.error('Error uploading photo:', error);
+          alert('Error uploading photo. Please try again.');
+        } finally {
+          setIsUploading(false);
+        }
+      }, 'image/jpeg', 0.8);
+    } catch (error) {
+      console.error('Error capturing photo:', error);
+      setIsUploading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'audio/wav' });
+        setAudioBlob(blob);
+        
+        try {
+          const { file_url } = await UploadFile({ file: blob });
+          setFormData(prev => ({ ...prev, voice_recording_url: file_url }));
+        } catch (error) {
+          console.error('Error uploading recording:', error);
+        }
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      setMediaRecorder(recorder);
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    // Validation
+    if (!sosMode) {
+      if (!hasMedia) {
+        alert('Please capture a photo or video');
+        return;
+      }
+      if (!hasLocation) {
+        alert('Please enable location access');
+        return;
+      }
+      if (!formData.type) {
+        alert('Please select hazard category');
+        return;
+      }
+    } else {
+      if (!formData.type || formData.type === 'other') {
+        alert('Please specify the type of emergency');
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const reportData = {
+        ...formData,
+        is_offline_sync: isOffline,
+        sync_status: isOffline ? 'pending' : 'synced'
+      };
+
+      await HazardReport.create(reportData);
+
+      if (user) {
+        await User.updateMyUserData({
+          total_reports: (user.total_reports || 0) + 1
+        });
+      }
+
+      alert(sosMode ? 'Emergency report submitted! Authorities have been notified.' : 'Report submitted successfully!');
+      window.location.href = createPageUrl('MyReports');
+    } catch (error) {
+      if (isOffline) {
+        const offlineReports = JSON.parse(localStorage.getItem('offline_reports') || '[]');
+        offlineReports.push({ ...formData, timestamp: Date.now() });
+        localStorage.setItem('offline_reports', JSON.stringify(offlineReports));
+        alert('Report saved offline. Will sync when online.');
+      } else {
+        console.error('Error submitting report:', error);
+        alert('Error submitting report. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 pb-20 md:pb-4">
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+            <h1 className="text-3xl font-bold text-gray-900">Report Coastal Hazard</h1>
+          </div>
+          <p className="text-gray-600">Help protect your community by reporting hazardous conditions</p>
+          
+          {isOffline && (
+            <Alert className="mt-4 bg-orange-50 border-orange-200">
+              <WifiOff className="h-4 w-4" />
+              <AlertDescription className="text-orange-700">
+                You're offline. Your report will be saved and synced when online.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        {/* SOS Button */}
+        <Card className="mb-8 bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-2xl">
+          <CardContent className="p-8 text-center">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold mb-2">Emergency Situation?</h2>
+              <p className="text-red-100">Click for immediate emergency reporting</p>
+            </div>
+            
+            <Button 
+              onClick={handleSosActivation}
+              disabled={sosMode}
+              className="bg-white text-red-600 hover:bg-red-50 text-xl px-12 py-6 rounded-full font-bold shadow-2xl transform transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+            >
+              <Siren className="w-8 h-8 mr-4 animate-pulse" />
+              {sosMode ? 'SOS ACTIVATED' : 'SOS EMERGENCY'}
+            </Button>
+            
+            {sosMode && (
+              <div className="mt-4 bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-white font-medium">
+                  🚨 Emergency mode activated. Please complete the form below.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Main Form */}
+        <Card className={`bg-white/90 backdrop-blur-sm shadow-xl ${sosMode ? 'ring-4 ring-red-300' : ''}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {sosMode ? (
+                <>
+                  <Siren className="w-5 h-5 text-red-600 animate-pulse" />
+                  Emergency Report Form
+                </>
+              ) : (
+                <>
+                  <Camera className="w-5 h-5" />
+                  Hazard Report Form
+                </>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* 1. Live Media Capture Only */}
+            <div>
+              <Label className="text-base font-semibold mb-4 block">
+                1. Capture Live Photo/Video {sosMode ? '(Auto-requested)' : '(Required)'}
+                <span className="text-red-500 ml-1">*</span>
+              </Label>
+              
+              <div className="space-y-4">
+                <div className="bg-gray-100 rounded-lg p-4">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full max-w-md mx-auto rounded-lg"
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+                
+                <div className="flex gap-4 justify-center">
+                  <Button
+                    onClick={startCamera}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Start Camera
+                  </Button>
+                  
+                  <Button
+                    onClick={capturePhoto}
+                    disabled={isUploading || !streamRef.current}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-4 h-4 mr-2" />
+                        Capture Photo
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                {hasMedia && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="font-medium">Media captured: {formData.media_urls.length} file(s)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Location */}
+            <div>
+              <Label className="text-base font-semibold mb-4 block">
+                2. Location {sosMode ? '(Auto-captured)' : '(Required)'}
+                <span className="text-red-500 ml-1">*</span>
+              </Label>
+              
+              <div className="space-y-4">
+                <Button
+                  onClick={() => handleGetLocation(false)}
+                  disabled={isGettingLocation || hasLocation}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  {isGettingLocation ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Getting Location...
+                    </>
+                  ) : hasLocation ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Location Captured
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Enable Location Access
+                    </>
+                  )}
+                </Button>
+
+                {locationError && (
+                  <Alert className="bg-red-50 border-red-200">
+                    <AlertDescription className="text-red-700">{locationError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {hasLocation && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="font-medium">Location: {formData.location.address}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3. Hazard Category */}
+            <div>
+              <Label className="text-base font-semibold mb-4 block">
+                3. Category of Hazard <span className="text-red-500">*</span>
+              </Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {hazardTypes.map((type) => (
+                  <Card 
+                    key={type.value}
+                    className={`cursor-pointer transition-all hover:shadow-md ${
+                      formData.type === type.value ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
+                  >
+                    <CardContent className="p-4 text-center">
+                      <div className="text-3xl mb-2">{type.icon}</div>
+                      <h3 className="font-semibold text-gray-800 text-sm">{type.label}</h3>
+                      <p className="text-xs text-gray-600 mt-1">{type.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* 4. Risk Level - Subtle Circles */}
+            <div>
+              <Label className="text-base font-semibold mb-4 block">
+                4. Level of Risk {sosMode && '(Set to Critical)'}
+              </Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {severityLevels.map((level) => (
+                  <Card
+                    key={level.value}
+                    className={`cursor-pointer transition-all hover:shadow-md ${
+                      formData.severity === level.value ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'
+                    } ${sosMode && level.value !== 'critical' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => !sosMode && setFormData(prev => ({ ...prev, severity: level.value }))}
+                  >
+                    <CardContent className="p-3 text-center">
+                      <div className={`w-6 h-6 rounded-full mx-auto mb-2 border-2 ${ // Updated size and added border-2
+                        level.value === 'critical' ? 'bg-red-200 border-red-400' :
+                        level.value === 'high' ? 'bg-orange-200 border-orange-400' :
+                        level.value === 'medium' ? 'bg-yellow-200 border-yellow-400' :
+                        'bg-green-200 border-green-400'
+                      }`}></div>
+                      <h3 className="font-medium text-gray-800 text-sm mb-1">{level.label}</h3>
+                      <p className="text-xs text-gray-600">{level.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* 5. Contact Number */}
+            <div>
+              <Label htmlFor="contact" className="text-base font-semibold">
+                5. Contact Number (Optional)
+              </Label>
+              <div className="flex gap-2 mt-2">
+                <Phone className="w-5 h-5 text-gray-400 mt-3" />
+                <Input
+                  id="contact"
+                  placeholder="Your phone number for follow-up"
+                  value={formData.contact_number}
+                  onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* 6. Description */}
+            <div>
+              <Label htmlFor="description" className="text-base font-semibold">
+                6. Additional Description (Optional)
+              </Label>
+              <Textarea
+                id="description"
+                placeholder="Describe what you're seeing..."
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="mt-2 min-h-[100px]"
+              />
+            </div>
+
+            {/* Voice Recording */}
+            <div>
+              <Label className="text-base font-semibold mb-4 block">Voice Recording (Optional)</Label>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                <div className="text-center space-y-4">
+                  {!isRecording && !audioBlob && (
+                    <Button 
+                      onClick={startRecording} 
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Mic className="w-4 h-4 mr-2" />
+                      Start Recording
+                    </Button>
+                  )}
+
+                  {isRecording && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-2 text-red-600">
+                        <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
+                        <span className="font-medium">Recording...</span>
+                      </div>
+                      <Button onClick={stopRecording} variant="outline" className="border-red-200 text-red-600">
+                        <Square className="w-4 h-4 mr-2" />
+                        Stop Recording
+                      </Button>
+                    </div>
+                  )}
+
+                  {audioBlob && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-2 text-green-600">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium">Voice recording captured</span>
+                      </div>
+                      <audio controls className="mx-auto">
+                        <source src={URL.createObjectURL(audioBlob)} type="audio/wav" />
+                      </audio>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-6 border-t">
+              <Button 
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className={`w-full text-lg py-6 ${sosMode ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} shadow-lg transform transition-all duration-300 hover:scale-105`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    {sosMode ? 'Sending Emergency Report...' : 'Submitting Report...'}
+                  </>
+                ) : (
+                  <>
+                    {sosMode ? (
+                      <>
+                        <Siren className="w-5 h-5 mr-2" />
+                        Submit Emergency Report
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Submit Hazard Report
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
+// hazard feed
+
+import React, { useState, useEffect, useCallback } from "react";
+import { HazardReport } from "@/entities/HazardReport";
+import { User } from "@/entities/User";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  MapPin,
+  List,
+  Filter,
+  AlertTriangle,
+  Shield,
+  Clock,
+  TrendingUp,
+  Activity
+} from "lucide-react";
+
+import FilterPanel from "../components/hazard/FilterPanel";
+import HazardCard from "../components/hazard/HazardCard";
+import HazardMap from "../components/hazard/HazardMap";
+
+export default function HazardFeed() {
+  const [user, setUser] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [filteredReports, setFilteredReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('list');
+  const [filters, setFilters] = useState({
+    status: 'all',
+    type: 'all',
+    severity: 'all',
+    timeframe: 'all'
+  });
+
+  const applyFilters = useCallback(() => {
+    let filtered = [...reports];
+
+    // Status filter
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(report => report.status === filters.status);
+    }
+
+    // Type filter
+    if (filters.type !== 'all') {
+      filtered = filtered.filter(report => report.type === filters.type);
+    }
+
+    // Severity filter
+    if (filters.severity !== 'all') {
+      filtered = filtered.filter(report => report.severity === filters.severity);
+    }
+
+    // Timeframe filter
+    if (filters.timeframe !== 'all') {
+      const now = new Date();
+      const timeframes = {
+        '1h': 1 * 60 * 60 * 1000,
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000
+      };
+      
+      const cutoff = new Date(now.getTime() - timeframes[filters.timeframe]);
+      filtered = filtered.filter(report => new Date(report.created_date) >= cutoff);
+    }
+
+    setFilteredReports(filtered);
+  }, [reports, filters]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const userData = await User.me();
+      setUser(userData);
+    } catch (error) {
+      console.log('User not authenticated');
+    }
+
+    try {
+      const allReports = await HazardReport.list('-created_date', 100);
+      setReports(allReports);
+    } catch (error) {
+      console.error('Error loading reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStats = () => {
+    const total = reports.length;
+    const verified = reports.filter(r => r.status === 'verified').length;
+    const pending = reports.filter(r => r.status === 'pending').length;
+    const critical = reports.filter(r => r.severity === 'critical').length;
+
+    return { total, verified, pending, critical };
+  };
+
+  const stats = getStats();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading hazard reports...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-100 pb-20 md:pb-4">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Coastal Hazard Feed</h1>
+          <p className="text-gray-600 mb-6">Real-time coastal hazard reports from your community</p>
+
+          {/* Stats Bar */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+            <Card className="bg-white/80 border-blue-200">
+              <CardContent className="p-4 text-center">
+                <Activity className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+                <p className="text-sm text-gray-600">Total Reports</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 border-green-200">
+              <CardContent className="p-4 text-center">
+                <Shield className="w-6 h-6 text-green-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-green-600">{stats.verified}</p>
+                <p className="text-sm text-gray-600">Verified</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 border-yellow-200">
+              <CardContent className="p-4 text-center">
+                <Clock className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                <p className="text-sm text-gray-600">Pending Review</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 border-red-200">
+              <CardContent className="p-4 text-center">
+                <AlertTriangle className="w-6 h-6 text-red-600 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
+                <p className="text-sm text-gray-600">Critical Alerts</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* View Toggle & Filters */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <Tabs value={activeView} onValueChange={setActiveView} className="w-full md:w-auto">
+            <TabsList className="grid w-full grid-cols-2 md:w-auto">
+              <TabsTrigger value="list" className="flex items-center gap-2">
+                <List className="w-4 h-4" />
+                List View
+              </TabsTrigger>
+              <TabsTrigger value="map" className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Map View
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <FilterPanel 
+            filters={filters} 
+            onFilterChange={setFilters}
+            reportCount={filteredReports.length}
+          />
+        </div>
+
+        {/* Content */}
+        {activeView === 'list' && (
+          <div className="space-y-4">
+            {filteredReports.length > 0 ? (
+              filteredReports.map((report) => (
+                <HazardCard key={report.id} report={report} currentUser={user} />
+              ))
+            ) : (
+              <Card className="bg-white/80 border-blue-100">
+                <CardContent className="p-12 text-center">
+                  <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No Reports Found</h3>
+                  <p className="text-gray-500 mb-6">
+                    {reports.length === 0 
+                      ? "No hazard reports have been submitted yet."
+                      : "No reports match your current filters."
+                    }
+                  </p>
+                  {reports.length === 0 && (
+                    <Button 
+                      onClick={() => window.location.href = createPageUrl('ReportHazard')}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Submit First Report
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+        
+        {activeView === 'map' && (
+            <HazardMap reports={filteredReports} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Myreport
+import React, { useState, useEffect } from "react";
+import { HazardReport } from "@/entities/HazardReport";
+import { User } from "@/entities/User";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Plus,
+  FileText,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Award,
+  TrendingUp,
+  AlertTriangle,
+  Shield
+} from "lucide-react";
+
+import UserStats from "../components/myreports/UserStats";
+import ReportCard from "../components/myreports/ReportCard";
+import ReportTimeline from "../components/myreports/ReportTimeline";
+
+export default function MyReports() {
+  const [user, setUser] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const userData = await User.me();
+      setUser(userData);
+
+      // Load user's reports
+      const userReports = await HazardReport.filter({created_by: userData.email}, '-created_date');
+      setReports(userReports);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      // Redirect to login if user not authenticated
+      await User.login();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFilteredReports = () => {
+    switch (activeTab) {
+      case 'verified':
+        return reports.filter(r => r.status === 'verified');
+      case 'pending':
+        return reports.filter(r => r.status === 'pending');
+      case 'investigating':
+        return reports.filter(r => r.status === 'investigating');
+      default:
+        return reports;
+    }
+  };
+
+  const getReportStats = () => {
+    const total = reports.length;
+    const verified = reports.filter(r => r.status === 'verified').length;
+    const pending = reports.filter(r => r.status === 'pending').length;
+    const investigating = reports.filter(r => r.status === 'investigating').length;
+    const rejected = reports.filter(r => r.status === 'rejected').length;
+    
+    return { total, verified, pending, investigating, rejected };
+  };
+
+  const getCredibilityLevel = (score) => {
+    if (score >= 90) return { level: 'Legendary Guardian', color: 'text-purple-600', bgColor: 'bg-purple-100' };
+    if (score >= 75) return { level: 'Coastal Champion', color: 'text-green-600', bgColor: 'bg-green-100' };
+    if (score >= 50) return { level: 'Reliable Reporter', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    return { level: 'New Guardian', color: 'text-gray-600', bgColor: 'bg-gray-100' };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your reports...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = getReportStats();
+  const credibilityInfo = getCredibilityLevel(user?.credibility_score || 50);
+  const filteredReports = getFilteredReports();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 pb-20 md:pb-4">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Reports Dashboard</h1>
+          <p className="text-gray-600 mb-6">Track your contributions and build your coastal guardian reputation</p>
+          
+          <Link to={createPageUrl("ReportHazard")}>
+            <Button className="bg-green-600 hover:bg-green-700">
+              <Plus className="w-5 h-5 mr-2" />
+              Submit New Report
+            </Button>
+          </Link>
+        </div>
+
+        {/* User Profile Card */}
+        <Card className="mb-8 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <span className="text-2xl font-bold">
+                  {user?.full_name?.[0] || 'U'}
+                </span>
+              </div>
+              
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold mb-1">{user?.full_name || 'Coastal Guardian'}</h2>
+                <Badge className={`${credibilityInfo.bgColor} ${credibilityInfo.color} mb-3`}>
+                  <Award className="w-3 h-3 mr-1" />
+                  {credibilityInfo.level}
+                </Badge>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold">{stats.total}</p>
+                    <p className="text-blue-100 text-sm">Total Reports</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{stats.verified}</p>
+                    <p className="text-green-100 text-sm">Verified</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{user?.credibility_score || 50}</p>
+                    <p className="text-purple-100 text-sm">Credibility Score</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{user?.badges?.length || 0}</p>
+                    <p className="text-orange-100 text-sm">Badges Earned</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Credibility Progress */}
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-blue-100">Credibility Progress</span>
+                <span className="text-white font-medium">{user?.credibility_score || 50}/100</span>
+              </div>
+              <Progress 
+                value={user?.credibility_score || 50} 
+                className="h-2 bg-white/20" 
+              />
+              <p className="text-blue-100 text-sm mt-2">
+                Keep submitting accurate reports to improve your credibility score!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white/80 border-green-200">
+            <CardContent className="p-4 text-center">
+              <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-green-600">{stats.verified}</p>
+              <p className="text-sm text-gray-600">Verified Reports</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-yellow-200">
+            <CardContent className="p-4 text-center">
+              <Clock className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              <p className="text-sm text-gray-600">Pending Review</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-blue-200">
+            <CardContent className="p-4 text-center">
+              <TrendingUp className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-blue-600">{stats.investigating}</p>
+              <p className="text-sm text-gray-600">Under Investigation</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-red-200">
+            <CardContent className="p-4 text-center">
+              <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+              <p className="text-sm text-gray-600">Needs Revision</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6 justify-center">
+          {[
+            { key: 'all', label: 'All Reports', count: stats.total },
+            { key: 'verified', label: 'Verified', count: stats.verified },
+            { key: 'pending', label: 'Pending', count: stats.pending },
+            { key: 'investigating', label: 'Investigating', count: stats.investigating }
+          ].map((tab) => (
+            <Button
+              key={tab.key}
+              variant={activeTab === tab.key ? "default" : "outline"}
+              onClick={() => setActiveTab(tab.key)}
+              className={activeTab === tab.key ? 'bg-blue-600 hover:bg-blue-700' : ''}
+            >
+              {tab.label} ({tab.count})
+            </Button>
+          ))}
+        </div>
+
+        {/* Reports List */}
+        <div className="space-y-4">
+          {filteredReports.length > 0 ? (
+            filteredReports.map((report) => (
+              <ReportCard key={report.id} report={report} />
+            ))
+          ) : (
+            <Card className="bg-white/80 border-blue-100">
+              <CardContent className="p-12 text-center">
+                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">
+                  {activeTab === 'all' ? 'No Reports Yet' : `No ${activeTab} Reports`}
+                </h3>
+                <p className="text-gray-500 mb-6">
+                  {activeTab === 'all' 
+                    ? "You haven't submitted any hazard reports yet. Be the first to help protect your community!"
+                    : `You don't have any reports with ${activeTab} status.`
+                  }
+                </p>
+                {activeTab === 'all' && (
+                  <Link to={createPageUrl("ReportHazard")}>
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Submit Your First Report
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Tips Card */}
+        {reports.length > 0 && (
+          <Card className="mt-8 bg-blue-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <Shield className="w-5 h-5" />
+                Tips to Improve Your Credibility Score
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-blue-700">
+                <li>• Include photos and videos when possible</li>
+                <li>• Provide accurate location information</li>
+                <li>• Write detailed descriptions of what you observe</li>
+                <li>• Submit reports promptly when you notice hazards</li>
+                <li>• Follow up with additional information if requested</li>
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Admin dashboard
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { HazardReport } from "@/entities/HazardReport";
+import { useToast } from "@/components/ui/use-toast";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  Crown,
+  Map,
+  ShieldCheck,
+  BarChart as BarChartIcon,
+  Home,
+  AlertTriangle,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+} from "lucide-react";
+import HazardMap from "../components/hazard/HazardMap";
+import VerificationModal from "../components/admin/VerificationModal";
+
+export default function AdminDashboard() {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, verified: 0, pending: 0 });
+  const [analytics, setAnalytics] = useState({ typeDistribution: [] });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [verificationAction, setVerificationAction] = useState(null); // 'verify' or 'reject'
+  const { toast } = useToast();
+
+  const calculateStats = useCallback((data) => {
+    const total = data.length;
+    const verified = data.filter(r => r.status === 'verified').length;
+    const pending = data.filter(r => ['pending', 'investigating'].includes(r.status)).length;
+    setStats({ total, verified, pending });
+  }, []); // No external dependencies, so empty array is correct
+
+  const calculateAnalytics = useCallback((data) => {
+    const typeCounts = data.reduce((acc, report) => {
+      acc[report.type] = (acc[report.type] || 0) + 1;
+      return acc;
+    }, {});
+
+    const typeDistribution = Object.keys(typeCounts).map(key => ({
+      name: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
+      count: typeCounts[key],
+    }));
+
+    setAnalytics({ typeDistribution });
+  }, []); // No external dependencies, so empty array is correct
+
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      const allReports = await HazardReport.list('-created_date');
+      setReports(allReports);
+      calculateStats(allReports);
+      calculateAnalytics(allReports);
+    } catch (error) {
+      console.error("Failed to fetch reports:", error);
+      toast({
+        title: "Error",
+        description: "Could not load hazard reports.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, calculateStats, calculateAnalytics]); // Depend on toast, and the memoized callback functions
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]); // Depend on the memoized fetchReports function
+
+  const openVerificationModal = (report, action) => {
+    setSelectedReport(report);
+    setVerificationAction(action);
+    setModalOpen(true);
+  };
+
+  const handleVerificationSubmit = async (notes) => {
+    if (!selectedReport || !verificationAction) return;
+
+    const newStatus = verificationAction === 'verify' ? 'verified' : 'false_report';
+
+    try {
+      await HazardReport.update(selectedReport.id, {
+        status: newStatus,
+        verification_notes: notes,
+      });
+      toast({
+        title: "Success",
+        description: `Report #${selectedReport.id.slice(-6)} has been ${newStatus}.`,
+        variant: "success",
+      });
+      fetchReports(); // Re-fetch data to update the UI
+    } catch (error) {
+      console.error("Failed to update report status:", error);
+      toast({
+        title: "Update Failed",
+        description: "Could not update the report status.",
+        variant: "destructive",
+      });
+    } finally {
+      setModalOpen(false);
+      setSelectedReport(null);
+      setVerificationAction(null);
+    }
+  };
+
+  const reportsToVerify = reports.filter(r => ['pending', 'investigating'].includes(r.status));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-indigo-100">
+        <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-cyan-100 to-indigo-100 pb-20 md:pb-4">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+          <div className="text-center md:text-left">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center md:justify-start gap-2">
+              <Crown className="w-8 h-8 text-purple-600" />
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600">Overview and management of Coastal Hazard Reports</p>
+          </div>
+          <Link to={createPageUrl('Landing')}>
+            <Button variant="outline" className="mt-4 md:mt-0 border-blue-400 text-blue-600 hover:bg-blue-50">
+              <Home className="w-4 h-4 mr-2" />
+              Go to User Home
+            </Button>
+          </Link>
+        </div>
+
+        {/* Overview Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-md">
+            <CardContent className="p-6 text-center">
+              <AlertTriangle className="w-10 h-10 text-red-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
+              <p className="text-sm text-gray-600">Total Reports</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-md">
+            <CardContent className="p-6 text-center">
+              <ShieldCheck className="w-10 h-10 text-green-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-gray-800">{stats.verified}</p>
+              <p className="text-sm text-gray-600">Verified Reports</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-md">
+            <CardContent className="p-6 text-center">
+              <Clock className="w-10 h-10 text-yellow-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
+              <p className="text-sm text-gray-600">Pending Verification</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Interactive Map Dashboard */}
+        <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-lg mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-800">
+              <Map className="w-5 h-5" />
+              Live Hazard Map
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HazardMap reports={reports} />
+          </CardContent>
+        </Card>
+
+        {/* Verification Panel */}
+        <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-lg mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-800">
+              <Eye className="w-5 h-5" />
+              Verification Queue ({reportsToVerify.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+              {reportsToVerify.length > 0 ? reportsToVerify.map(report => (
+                <div key={report.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 capitalize">{report.type} Report #{report.id.slice(-6)}</h4>
+                    <p className="text-sm text-gray-600">{report.location?.address || 'No address'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => openVerificationModal(report, 'verify')}>
+                      <CheckCircle className="w-4 h-4" /> Verify
+                    </Button>
+                    <Button size="sm" variant="outline" className="border-red-400 text-red-600 hover:bg-red-50" onClick={() => openVerificationModal(report, 'reject')}>
+                      <XCircle className="w-4 h-4" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                  <p>No reports are currently pending verification. Great job!</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Analytics & Insights */}
+        <Card className="bg-white/80 backdrop-blur-sm border-blue-200 shadow-lg mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <BarChartIcon className="w-5 h-5" />
+              Analytics & Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <h4 className="font-semibold text-gray-800 mb-4 text-center">Hazard Type Distribution</h4>
+             <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <BarChart
+                  data={analytics.typeDistribution}
+                  margin={{
+                    top: 5, right: 30, left: 20, bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="count" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {selectedReport && (
+        <VerificationModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSubmit={handleVerificationSubmit}
+          action={verificationAction}
+        />
+      )}
+    </div>
+  );
+}
+
+// community
+import React, { useState, useEffect } from "react";
+import { User } from "@/entities/User";
+import { HazardReport } from "@/entities/HazardReport";
+import { InvokeLLM } from "@/integrations/Core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Users, 
+  MessageCircle, 
+  Award, 
+  TrendingUp,
+  Calendar,
+  Globe,
+  RefreshCw,
+  ExternalLink,
+  Clock,
+  Newspaper
+} from "lucide-react";
+import { format } from 'date-fns';
+
+export default function Community() {
+  const [user, setUser] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [news, setNews] = useState([]);
+  const [loadingNews, setLoadingNews] = useState(false);
+  const [communityStats, setCommunityStats] = useState({
+    totalMembers: 0,
+    activeReports: 0,
+    verifiedReports: 0,
+    topContributors: []
+  });
+
+  useEffect(() => {
+    loadData();
+    loadNews();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const userData = await User.me();
+      setUser(userData);
+    } catch (error) {
+      console.log('User not authenticated');
+    }
+
+    try {
+      const allReports = await HazardReport.list('-created_date', 50);
+      setReports(allReports);
+      
+      // Calculate community stats
+      const totalMembers = new Set(allReports.map(r => r.created_by)).size;
+      const activeReports = allReports.filter(r => ['pending', 'investigating'].includes(r.status)).length;
+      const verifiedReports = allReports.filter(r => r.status === 'verified').length;
+      
+      // Get top contributors
+      const contributorCounts = {};
+      allReports.forEach(report => {
+        contributorCounts[report.created_by] = (contributorCounts[report.created_by] || 0) + 1;
+      });
+      
+      const topContributors = Object.entries(contributorCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([email, count]) => ({ email, count }));
+
+      setCommunityStats({
+        totalMembers,
+        activeReports,
+        verifiedReports,
+        topContributors
+      });
+    } catch (error) {
+      console.error('Error loading reports:', error);
+    }
+  };
+
+  const loadNews = async () => {
+    setLoadingNews(true);
+    try {
+      const response = await InvokeLLM({
+        prompt: `Generate 5 recent realistic coastal hazard news items for India. Include: title, summary (2-3 lines), location, date (within last 7 days), and severity level. Format as JSON array with fields: title, summary, location, date, severity, source.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            news_items: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  summary: { type: "string" },
+                  location: { type: "string" },
+                  date: { type: "string" },
+                  severity: { type: "string" },
+                  source: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      setNews(response.news_items || []);
+    } catch (error) {
+      console.error('Error loading news:', error);
+      // Fallback news items
+      setNews([
+        {
+          title: "Coastal Erosion Alert Issued for Kerala Beaches",
+          summary: "Authorities warn of increased coastal erosion along Varkala and Kovalam beaches following recent monsoon activity.",
+          location: "Kerala",
+          date: new Date(Date.now() - 86400000).toISOString(),
+          severity: "Medium",
+          source: "Kerala Disaster Management"
+        },
+        {
+          title: "Cyclone Warning for Andhra Pradesh Coast",
+          summary: "Low pressure system in Bay of Bengal likely to intensify. Fishermen advised not to venture into sea.",
+          location: "Andhra Pradesh",
+          date: new Date(Date.now() - 2 * 86400000).toISOString(),
+          severity: "High",
+          source: "IMD Weather"
+        }
+      ]);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
+
+  const recentActivity = reports.slice(0, 10);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 pb-20 md:pb-4">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Community Hub</h1>
+          <p className="text-gray-600 mb-6">Connect with fellow guardians and stay informed</p>
+          
+          {!user && (
+            <Button 
+              onClick={() => User.login()}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Join Community
+            </Button>
+          )}
+        </div>
+
+        {/* Community Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white/80 border-blue-200">
+            <CardContent className="p-4 text-center">
+              <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-blue-600">{communityStats.totalMembers}</p>
+              <p className="text-sm text-gray-600">Active Members</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-orange-200">
+            <CardContent className="p-4 text-center">
+              <TrendingUp className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-orange-600">{communityStats.activeReports}</p>
+              <p className="text-sm text-gray-600">Active Reports</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-green-200">
+            <CardContent className="p-4 text-center">
+              <Award className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-green-600">{communityStats.verifiedReports}</p>
+              <p className="text-sm text-gray-600">Verified Reports</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white/80 border-purple-200">
+            <CardContent className="p-4 text-center">
+              <MessageCircle className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-purple-600">24/7</p>
+              <p className="text-sm text-gray-600">Support Available</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="news" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="news">Live News</TabsTrigger>
+            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+            <TabsTrigger value="leaderboard">Top Contributors</TabsTrigger>
+          </TabsList>
+
+          {/* Live News Tab */}
+          <TabsContent value="news">
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Newspaper className="w-5 h-5 text-red-600" />
+                    Live Coastal News
+                  </CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={loadNews}
+                    disabled={loadingNews}
+                  >
+                    {loadingNews ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {news.map((item, index) => (
+                    <Card key={index} className="bg-gray-50 border border-gray-200">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-gray-800 text-lg">{item.title}</h3>
+                          <Badge className={
+                            item.severity === 'High' ? 'bg-red-100 text-red-800' :
+                            item.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }>
+                            {item.severity}
+                          </Badge>
+                        </div>
+                        <p className="text-gray-600 mb-3">{item.summary}</p>
+                        <div className="flex items-center justify-between text-sm text-gray-500">
+                          <div className="flex items-center gap-4">
+                            <span className="flex items-center gap-1">
+                              <Globe className="w-4 h-4" />
+                              {item.location}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {format(new Date(item.date), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                          <span className="text-blue-600 font-medium">{item.source}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Recent Activity Tab */}
+          <TabsContent value="activity">
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  Recent Community Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentActivity.map((report) => (
+                    <div key={report.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold">
+                          {report.created_by?.[0]?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800 capitalize">
+                          {report.type} report submitted
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {report.location?.district || 'Unknown location'} • {format(new Date(report.created_date), 'MMM d, h:mm a')}
+                        </p>
+                      </div>
+                      <Badge className={
+                        report.status === 'verified' ? 'bg-green-100 text-green-800' :
+                        report.status === 'investigating' ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }>
+                        {report.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Top Contributors Tab */}
+          <TabsContent value="leaderboard">
+            <Card className="bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-yellow-600" />
+                  Top Contributors
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {communityStats.topContributors.map((contributor, index) => (
+                    <div key={contributor.email} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold">
+                        #{index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800">
+                          Guardian {contributor.email.split('@')[0]}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {contributor.count} reports submitted
+                        </p>
+                      </div>
+                      <Badge className="bg-yellow-100 text-yellow-800">
+                        <Award className="w-3 h-3 mr-1" />
+                        {index === 0 ? 'Champion' : index === 1 ? 'Expert' : 'Contributor'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+
+// admin communication
+import React, { useState, useEffect } from "react";
+import { User } from "@/entities/User";
+import { HazardReport } from "@/entities/HazardReport";
+import { SendEmail } from "@/integrations/Core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  Send, 
+  Users, 
+  AlertTriangle, 
+  Megaphone,
+  Radio,
+  Shield,
+  Clock,
+  CheckCircle
+} from "lucide-react";
+
+export default function AdminCommunications() {
+  const [user, setUser] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({
+    subject: '',
+    body: '',
+    type: 'general', // general, alert, emergency
+    recipients: 'all' // all, affected_areas, specific
+  });
+  const [sendStatus, setSendStatus] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const userData = await User.me();
+      setUser(userData);
+
+      const allReports = await HazardReport.list('-created_date');
+      setReports(allReports);
+
+      const users = await User.list();
+      setAllUsers(users);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  const handleSendAlert = async () => {
+    if (!message.subject || !message.body) {
+      setSendStatus('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setSendStatus('Sending alerts...');
+
+    try {
+      const recipients = message.recipients === 'all' ? allUsers : 
+                        allUsers.filter(u => u.location_area === 'affected'); // Simplified filtering
+
+      let successCount = 0;
+      for (const recipient of recipients) {
+        try {
+          await SendEmail({
+            to: recipient.email,
+            subject: `🚨 CoastGuard AI Alert: ${message.subject}`,
+            body: `
+              Dear Coastal Guardian,
+              
+              ${message.body}
+              
+              This is an official alert from CoastGuard AI Crisis Management System.
+              
+              Stay safe,
+              CoastGuard AI Team
+            `,
+            from_name: "CoastGuard AI Crisis Team"
+          });
+          successCount++;
+        } catch (error) {
+          console.error('Failed to send to:', recipient.email);
+        }
+      }
+
+      setSendStatus(`Successfully sent to ${successCount} recipients`);
+      setMessage({ subject: '', body: '', type: 'general', recipients: 'all' });
+    } catch (error) {
+      setSendStatus('Error sending alerts');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const criticalReports = reports.filter(r => r.severity === 'critical');
+  const activeAlerts = reports.filter(r => ['pending', 'investigating'].includes(r.status));
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 pb-20 md:pb-4">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Radio className="w-8 h-8 text-red-600" />
+            <h1 className="text-3xl font-bold text-gray-900">Crisis Command Center</h1>
+          </div>
+          <p className="text-gray-600">Emergency communications and alert management system</p>
+        </div>
+
+        {/* Crisis Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-red-100 border-red-200">
+            <CardContent className="p-6 text-center">
+              <AlertTriangle className="w-10 h-10 text-red-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-red-600">{criticalReports.length}</p>
+              <p className="text-sm text-red-700">Critical Alerts</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-yellow-100 border-yellow-200">
+            <CardContent className="p-6 text-center">
+              <Clock className="w-10 h-10 text-yellow-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-yellow-600">{activeAlerts.length}</p>
+              <p className="text-sm text-yellow-700">Active Incidents</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-blue-100 border-blue-200">
+            <CardContent className="p-6 text-center">
+              <Users className="w-10 h-10 text-blue-600 mx-auto mb-3" />
+              <p className="text-2xl font-bold text-blue-600">{allUsers.length}</p>
+              <p className="text-sm text-blue-700">Total Users</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="broadcast" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="broadcast">Mass Alert</TabsTrigger>
+            <TabsTrigger value="emergency">Emergency Broadcast</TabsTrigger>
+            <TabsTrigger value="history">Alert History</TabsTrigger>
+          </TabsList>
+
+          {/* Mass Alert Tab */}
+          <TabsContent value="broadcast">
+            <Card className="bg-white/90 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Megaphone className="w-5 h-5 text-blue-600" />
+                  Send Mass Alert
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Alert Subject</label>
+                  <Input
+                    placeholder="e.g., Coastal Warning - High Tide Alert"
+                    value={message.subject}
+                    onChange={(e) => setMessage({...message, subject: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Alert Message</label>
+                  <Textarea
+                    placeholder="Compose your alert message here..."
+                    className="min-h-[150px]"
+                    value={message.body}
+                    onChange={(e) => setMessage({...message, body: e.target.value})}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Alert Type</label>
+                    <select 
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={message.type}
+                      onChange={(e) => setMessage({...message, type: e.target.value})}
+                    >
+                      <option value="general">General Alert</option>
+                      <option value="warning">Weather Warning</option>
+                      <option value="emergency">Emergency Alert</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Recipients</label>
+                    <select 
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      value={message.recipients}
+                      onChange={(e) => setMessage({...message, recipients: e.target.value})}
+                    >
+                      <option value="all">All Users</option>
+                      <option value="affected_areas">Affected Areas Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                {sendStatus && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertDescription className="text-blue-700">
+                      {sendStatus}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Button 
+                  onClick={handleSendAlert}
+                  disabled={loading}
+                  className="w-full bg-red-600 hover:bg-red-700 text-lg py-6"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Sending Alert...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5 mr-2" />
+                      Send Alert to {message.recipients === 'all' ? allUsers.length : 'Affected'} Users
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Emergency Broadcast Tab */}
+          <TabsContent value="emergency">
+            <Card className="bg-red-50 border-red-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-800">
+                  <Shield className="w-5 h-5" />
+                  Emergency Broadcast System
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Alert className="bg-red-100 border-red-300">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800">
+                    Emergency broadcasts are sent immediately to all users. Use only for critical situations.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Button 
+                    className="h-20 bg-red-600 hover:bg-red-700 flex-col"
+                    onClick={() => setMessage({
+                      subject: 'TSUNAMI WARNING',
+                      body: 'IMMEDIATE EVACUATION REQUIRED. Move to higher ground immediately. This is not a drill.',
+                      type: 'emergency',
+                      recipients: 'all'
+                    })}
+                  >
+                    <AlertTriangle className="w-6 h-6 mb-2" />
+                    Tsunami Alert
+                  </Button>
+                  
+                  <Button 
+                    className="h-20 bg-orange-600 hover:bg-orange-700 flex-col"
+                    onClick={() => setMessage({
+                      subject: 'CYCLONE WARNING',
+                      body: 'Severe cyclone approaching. Seek immediate shelter. Avoid coastal areas.',
+                      type: 'emergency',
+                      recipients: 'all'
+                    })}
+                  >
+                    <Radio className="w-6 h-6 mb-2" />
+                    Cyclone Alert
+                  </Button>
+
+                  <Button 
+                    className="h-20 bg-yellow-600 hover:bg-yellow-700 flex-col"
+                    onClick={() => setMessage({
+                      subject: 'EVACUATION ORDER',
+                      body: 'Mandatory evacuation in effect. Follow designated evacuation routes immediately.',
+                      type: 'emergency',
+                      recipients: 'all'
+                    })}
+                  >
+                    <Users className="w-6 h-6 mb-2" />
+                    Evacuation
+                  </Button>
+
+                  <Button 
+                    className="h-20 bg-green-600 hover:bg-green-700 flex-col"
+                    onClick={() => setMessage({
+                      subject: 'ALL CLEAR',
+                      body: 'Emergency situation resolved. Normal activities may resume. Stay alert for updates.',
+                      type: 'general',
+                      recipients: 'all'
+                    })}
+                  >
+                    <CheckCircle className="w-6 h-6 mb-2" />
+                    All Clear
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Alert History Tab */}
+          <TabsContent value="history">
+            <Card className="bg-white/90 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-gray-600" />
+                  Recent Alerts History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Clock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Alert History</h3>
+                  <p className="text-gray-500">Previous alerts and communications will appear here.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

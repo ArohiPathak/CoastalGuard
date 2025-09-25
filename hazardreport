@@ -1,0 +1,124 @@
+{
+  "name": "HazardReport",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "flood",
+        "cyclone",
+        "erosion",
+        "pollution",
+        "tsunami",
+        "storm_surge",
+        "other"
+      ],
+      "description": "Type of coastal hazard"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium",
+      "description": "Severity level of the hazard"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the hazard"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        },
+        "address": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "description": "Location information for the hazard"
+    },
+    "media_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "URLs of photos/videos"
+    },
+    "voice_recording_url": {
+      "type": "string",
+      "description": "URL of voice recording"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified",
+        "investigating",
+        "resolved",
+        "false_report"
+      ],
+      "default": "pending",
+      "description": "Current status of the report"
+    },
+    "credibility_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Credibility score of the report"
+    },
+    "upvotes": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of upvotes"
+    },
+    "downvotes": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of downvotes"
+    },
+    "verification_notes": {
+      "type": "string",
+      "description": "Official verification notes"
+    },
+    "is_offline_sync": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether report was created offline"
+    },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "synced",
+        "pending",
+        "failed"
+      ],
+      "default": "synced",
+      "description": "Sync status of the report"
+    },
+    "language": {
+      "type": "string",
+      "default": "english",
+      "description": "Language of the report"
+    }
+  },
+  "required": [
+    "type",
+    "description"
+  ]
+}
